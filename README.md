@@ -49,9 +49,14 @@ This application:
 
 ## Development
 
-This is a standalone HTML application with no build process required. Simply open `index.html` in a web browser to run it.
+This is a standalone HTML application with no build process required. 
 
-To host it on a web server:
+### Running Locally
+
+**Option 1: Direct file access (simplest)**
+Simply open `index.html` directly in your web browser. Note: Some browsers may restrict microphone access for file:// URLs.
+
+**Option 2: Local web server (recommended)**
 ```bash
 # Using Python 3
 python -m http.server 8000
@@ -61,6 +66,14 @@ npx http-server -p 8000
 ```
 
 Then navigate to `http://localhost:8000` in your browser.
+
+### Dependencies
+
+The application loads Babylon.js from a CDN. If you need to run this offline or in an environment without internet access:
+
+1. Download Babylon.js: https://cdn.babylonjs.com/babylon.js
+2. Save it in the same directory as index.html
+3. Update the script tag in index.html to: `<script src="babylon.js"></script>`
 
 ## License
 

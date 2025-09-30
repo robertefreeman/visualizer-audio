@@ -120,7 +120,8 @@
         <p>Make some noise to see the visualization!</p>
     </div>
 
-    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <!-- Babylon.js library from CDN -->
+    <script src="https://cdn.babylonjs.com/babylon.js" crossorigin="anonymous"></script>
     <script>
         const canvas = document.getElementById('renderCanvas');
         const startButton = document.getElementById('startButton');
@@ -129,6 +130,22 @@
         let engine, scene, camera, audioContext, analyser, microphone, dataArray;
         let visualizationBars = [];
         let isRunning = false;
+
+        function checkBabylonLoaded() {
+            if (typeof BABYLON === 'undefined') {
+                showStatus('Loading 3D engine...', 'info');
+                setTimeout(() => {
+                    if (typeof BABYLON === 'undefined') {
+                        showStatus('Error: 3D engine failed to load. Please check your internet connection and ad blockers.', 'error');
+                        console.error('Babylon.js failed to load from CDN');
+                    } else {
+                        initBabylon();
+                    }
+                }, 2000);
+                return false;
+            }
+            return true;
+        }
 
         function showStatus(message, type = 'info') {
             statusDiv.textContent = message;
@@ -331,7 +348,11 @@
             }
         });
 
-        initBabylon();
+        window.addEventListener('load', () => {
+            if (checkBabylonLoaded()) {
+                initBabylon();
+            }
+        });
     </script>
 </body>
 </html>
