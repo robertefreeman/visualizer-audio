@@ -21,6 +21,9 @@ tmp/
 temp/
 *.tmp
 
+# Test files (optional - remove this line if you want to include test.html)
+# test.html
+
 # Logs
 *.log
 npm-debug.log*
