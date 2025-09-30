@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Visualizer Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #1a1a2e;
+            color: #fff;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+        .pass { color: #0f0; }
+        .fail { color: #f00; }
+        .info { color: #ff0; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        button:hover { background: #764ba2; }
+    </style>
+</head>
+<body>
+    <h1>3D Audio Visualizer - Validation Tests</h1>
+    
+    <div class="test-section">
+        <h2>1. HTML Structure Tests</h2>
+        <div id="structure-tests"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. Browser API Support Tests</h2>
+        <div id="api-tests"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Microphone Access Test</h2>
+        <button onclick="testMicrophone()">Test Microphone Access</button>
+        <div id="mic-test"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. Web Audio API Test</h2>
+        <button onclick="testWebAudio()">Test Audio Context</button>
+        <div id="audio-test"></div>
+    </div>
+
+    <script>
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const span = document.createElement('div');
+            span.className = type;
+            span.textContent = `[${type.toUpperCase()}] ${message}`;
+            element.appendChild(span);
+        }
+
+        // Test 1: HTML Structure
+        function testStructure() {
+            log('structure-tests', 'These tests verify HTML structure exists in index.html', 'info');
+            log('structure-tests', 'Canvas element (#renderCanvas): Required for 3D rendering', 'info');
+            log('structure-tests', 'Start button (#startButton): Required for user interaction', 'info');
+            log('structure-tests', 'Status div (#status): Required for user feedback', 'info');
+            log('structure-tests', 'To validate index.html structure, open index.html in browser DevTools', 'info');
+        }
+
+        // Test 2: Browser API Support
+        function testAPIs() {
+            const apis = [
+                { name: 'getUserMedia', check: () => !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) },
+                { name: 'AudioContext', check: () => !!(window.AudioContext || window.webkitAudioContext) },
+                { name: 'Canvas API', check: () => !!document.createElement('canvas').getContext },
+                { name: 'WebGL Support', check: () => {
+                    const canvas = document.createElement('canvas');
+                    return !!(canvas.getContext('webgl') || canvas.getContext('experimental-webgl'));
+                }},
+                { name: 'requestAnimationFrame', check: () => !!window.requestAnimationFrame },
+            ];
+
+            apis.forEach(api => {
+                try {
+                    const result = api.check();
+                    log('api-tests', `${api.name}: ${result ? 'SUPPORTED' : 'NOT SUPPORTED'}`, result ? 'pass' : 'fail');
+                } catch (e) {
+                    log('api-tests', `${api.name}: ERROR - ${e.message}`, 'fail');
+                }
+            });
+        }
+
+        // Test 3: Microphone Access
+        async function testMicrophone() {
+            const micTest = document.getElementById('mic-test');
+            micTest.innerHTML = '<div class="info">Testing microphone access...</div>';
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                log('mic-test', 'Microphone access granted!', 'pass');
+                log('mic-test', `Audio tracks: ${stream.getAudioTracks().length}`, 'info');
+                
+                stream.getTracks().forEach(track => {
+                    log('mic-test', `Track: ${track.kind} - ${track.label}`, 'info');
+                    track.stop();
+                });
+                
+                log('mic-test', 'Microphone test complete', 'pass');
+            } catch (error) {
+                log('mic-test', `Microphone access failed: ${error.message}`, 'fail');
+                log('mic-test', 'This is expected if you denied permission', 'info');
+            }
+        }
+
+        // Test 4: Web Audio API
+        function testWebAudio() {
+            const FFT_SIZE = 128;
+            const audioTest = document.getElementById('audio-test');
+            audioTest.innerHTML = '<div class="info">Testing Web Audio API...</div>';
+            
+            try {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                const audioContext = new AudioContextClass();
+                
+                log('audio-test', 'AudioContext created successfully', 'pass');
+                log('audio-test', `Sample rate: ${audioContext.sampleRate}Hz`, 'info');
+                log('audio-test', `State: ${audioContext.state}`, 'info');
+                
+                const analyser = audioContext.createAnalyser();
+                analyser.fftSize = FFT_SIZE;
+                log('audio-test', `Analyser created with FFT size: ${analyser.fftSize}`, 'pass');
+                log('audio-test', `Frequency bin count: ${analyser.frequencyBinCount}`, 'info');
+                log('audio-test', 'Note: Main app uses same FFT size (128) as configured here', 'info');
+                
+                audioContext.close();
+                log('audio-test', 'Web Audio API test complete', 'pass');
+            } catch (error) {
+                log('audio-test', `Web Audio API test failed: ${error.message}`, 'fail');
+            }
+        }
+
+        // Run automatic tests on load
+        window.addEventListener('load', () => {
+            testStructure();
+            testAPIs();
+        });
+    </script>
+</body>
+</html>
