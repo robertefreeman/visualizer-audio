@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Audio Visualizer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+        }
+
+        #renderCanvas {
+            width: 100%;
+            height: 100vh;
+            display: block;
+            outline: none;
+            touch-action: none;
+        }
+
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            text-align: center;
+        }
+
+        #startButton {
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #fff;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        #startButton:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        #startButton:active {
+            transform: translateY(0);
+        }
+
+        #startButton:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 14px;
+            backdrop-filter: blur(10px);
+        }
+
+        #info h3 {
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+
+        #status {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #fff;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: none;
+        }
+
+        #status.show {
+            display: block;
+        }
+
+        #status.error {
+            background: rgba(255, 0, 0, 0.7);
+        }
+
+        #status.success {
+            background: rgba(0, 255, 0, 0.7);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    
+    <div id="controls">
+        <button id="startButton">Start Visualizer</button>
+    </div>
+
+    <div id="status"></div>
+
+    <div id="info">
+        <h3>3D Audio Visualizer</h3>
+        <p>Click "Start Visualizer" to begin</p>
+        <p>Allow microphone access when prompted</p>
+        <p>Make some noise to see the visualization!</p>
+    </div>
+
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script>
+        const canvas = document.getElementById('renderCanvas');
+        const startButton = document.getElementById('startButton');
+        const statusDiv = document.getElementById('status');
+        
+        let engine, scene, camera, audioContext, analyser, microphone, dataArray;
+        let visualizationBars = [];
+        let isRunning = false;
+
+        function showStatus(message, type = 'info') {
+            statusDiv.textContent = message;
+            statusDiv.className = 'show ' + type;
+            setTimeout(() => {
+                statusDiv.className = '';
+            }, 3000);
+        }
+
+        function initBabylon() {
+            engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+            scene = new BABYLON.Scene(engine);
+            scene.clearColor = new BABYLON.Color3(0.02, 0.02, 0.05);
+
+            camera = new BABYLON.ArcRotateCamera(
+                'camera',
+                Math.PI / 2,
+                Math.PI / 3,
+                50,
+                BABYLON.Vector3.Zero(),
+                scene
+            );
+            camera.attachControl(canvas, true);
+            camera.lowerRadiusLimit = 20;
+            camera.upperRadiusLimit = 100;
+
+            const light = new BABYLON.HemisphericLight(
+                'light',
+                new BABYLON.Vector3(0, 1, 0),
+                scene
+            );
+            light.intensity = 0.7;
+
+            const pointLight = new BABYLON.PointLight(
+                'pointLight',
+                new BABYLON.Vector3(0, 10, 0),
+                scene
+            );
+            pointLight.intensity = 0.5;
+
+            createVisualizationBars();
+
+            engine.runRenderLoop(() => {
+                scene.render();
+            });
+
+            window.addEventListener('resize', () => {
+                engine.resize();
+            });
+        }
+
+        function createVisualizationBars() {
+            const numBars = 64;
+            const radius = 15;
+
+            for (let i = 0; i < numBars; i++) {
+                const angle = (i / numBars) * Math.PI * 2;
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius;
+
+                const bar = BABYLON.MeshBuilder.CreateBox(
+                    `bar${i}`,
+                    { width: 0.5, height: 1, depth: 0.5 },
+                    scene
+                );
+
+                bar.position.x = x;
+                bar.position.z = z;
+
+                const hue = (i / numBars) * 360;
+                const material = new BABYLON.StandardMaterial(`mat${i}`, scene);
+                material.diffuseColor = BABYLON.Color3.FromHSV(hue, 0.8, 1);
+                material.emissiveColor = BABYLON.Color3.FromHSV(hue, 0.5, 0.3);
+                material.specularColor = new BABYLON.Color3(0.5, 0.5, 0.5);
+                bar.material = material;
+
+                visualizationBars.push({
+                    mesh: bar,
+                    originalY: 0,
+                    targetScale: 1
+                });
+            }
+
+            const centralSphere = BABYLON.MeshBuilder.CreateSphere(
+                'centerSphere',
+                { diameter: 3 },
+                scene
+            );
+            const sphereMat = new BABYLON.StandardMaterial('sphereMat', scene);
+            sphereMat.diffuseColor = new BABYLON.Color3(0.4, 0.2, 0.8);
+            sphereMat.emissiveColor = new BABYLON.Color3(0.2, 0.1, 0.4);
+            sphereMat.alpha = 0.8;
+            centralSphere.material = sphereMat;
+
+            visualizationBars.push({
+                mesh: centralSphere,
+                originalY: 0,
+                targetScale: 1,
+                isSphere: true
+            });
+        }
+
+        async function initAudio() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 128;
+                
+                microphone = audioContext.createMediaStreamSource(stream);
+                microphone.connect(analyser);
+
+                const bufferLength = analyser.frequencyBinCount;
+                dataArray = new Uint8Array(bufferLength);
+
+                showStatus('Microphone connected!', 'success');
+                isRunning = true;
+                startButton.textContent = 'Stop Visualizer';
+                
+                animate();
+            } catch (error) {
+                console.error('Error accessing microphone:', error);
+                showStatus('Microphone access denied. Please allow microphone access.', 'error');
+                startButton.disabled = false;
+            }
+        }
+
+        function animate() {
+            if (!isRunning) return;
+
+            analyser.getByteFrequencyData(dataArray);
+
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+            }
+            const average = sum / dataArray.length;
+
+            for (let i = 0; i < visualizationBars.length - 1; i++) {
+                const barIndex = Math.floor((i / (visualizationBars.length - 1)) * dataArray.length);
+                const value = dataArray[barIndex] / 255;
+                
+                const targetHeight = 1 + value * 15;
+                const currentHeight = visualizationBars[i].mesh.scaling.y;
+                visualizationBars[i].mesh.scaling.y = currentHeight + (targetHeight - currentHeight) * 0.3;
+                
+                visualizationBars[i].mesh.position.y = visualizationBars[i].mesh.scaling.y / 2;
+
+                if (visualizationBars[i].mesh.material) {
+                    visualizationBars[i].mesh.material.emissiveColor = 
+                        BABYLON.Color3.FromHSV((i / (visualizationBars.length - 1)) * 360, 0.5, 0.3 + value * 0.5);
+                }
+            }
+
+            const lastBar = visualizationBars[visualizationBars.length - 1];
+            if (lastBar.isSphere) {
+                const scale = 1 + (average / 255) * 2;
+                lastBar.mesh.scaling.x = lastBar.mesh.scaling.x + (scale - lastBar.mesh.scaling.x) * 0.2;
+                lastBar.mesh.scaling.y = lastBar.mesh.scaling.y + (scale - lastBar.mesh.scaling.y) * 0.2;
+                lastBar.mesh.scaling.z = lastBar.mesh.scaling.z + (scale - lastBar.mesh.scaling.z) * 0.2;
+
+                if (lastBar.mesh.material) {
+                    lastBar.mesh.material.emissiveColor = 
+                        new BABYLON.Color3(0.2 + (average / 255) * 0.5, 0.1, 0.4 + (average / 255) * 0.4);
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        function stopAudio() {
+            if (microphone) {
+                microphone.disconnect();
+            }
+            if (audioContext) {
+                audioContext.close();
+            }
+            isRunning = false;
+            startButton.textContent = 'Start Visualizer';
+            showStatus('Visualizer stopped', 'info');
+
+            for (let i = 0; i < visualizationBars.length - 1; i++) {
+                visualizationBars[i].mesh.scaling.y = 1;
+                visualizationBars[i].mesh.position.y = 0.5;
+            }
+            const lastBar = visualizationBars[visualizationBars.length - 1];
+            if (lastBar.isSphere) {
+                lastBar.mesh.scaling = new BABYLON.Vector3(1, 1, 1);
+            }
+        }
+
+        startButton.addEventListener('click', () => {
+            if (!isRunning) {
+                startButton.disabled = true;
+                showStatus('Requesting microphone access...', 'info');
+                initAudio();
+            } else {
+                stopAudio();
+            }
+        });
+
+        initBabylon();
+    </script>
+</body>
+</html>
